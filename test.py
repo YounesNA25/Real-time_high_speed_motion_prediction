@@ -50,26 +50,42 @@ def compute_local_flow(events, neighborhood_size=5):
 
 import numpy as np
 
-def plane_fitting(x: np.ndarray, y: np.ndarray, ts: np.ndarray):
+def plane_fitting(x, y, t, events, neighborhood_size):
     """
-    Performs a least squares plane fit to the given points.
-    
-    @param x: np.ndarray of x coordinates.
-    @param y: np.ndarray of y coordinates.
-    @param ts: np.ndarray of time stamps or third dimension coordinates.
-    
-    @return: (a, b, c) coefficients of the fitted plane of the form z = ax + by + c.
-             Returns None if fitting is not possible.
+    Fits a plane to the neighborhood of a given event using least squares method.
+
+    Parameters:
+    x, y, t: coordinates of the event for which to calculate the flow.
+    events: list of all events (x, y, t) to search for neighbors.
+    neighborhood_size: the spatial extent of the neighborhood around the event.
+
+    Returns:
+    a, b, c: coefficients of the fitted plane, or None if fitting is not possible.
     """
-    # Construct the design matrix with x, y, and a column of ones for the intercept term.
-    A = np.c_[x, y, np.ones(x.shape[0])]
-    
-    # Use least squares to solve for the plane coefficients.
-    # np.linalg.lstsq returns several values; we only want the coefficients here.
-    coefficients, _, _, _ = np.linalg.lstsq(A, ts, rcond=None)
-    
-    # coefficients are [a, b, c] of the plane equation.
-    return coefficients if coefficients.size else None
+
+    # Find the neighborhood indices for the event
+    neighborhood_indices = get_neighborhood(x, y, t, events, neighborhood_size)
+
+    # Extract the neighborhood points
+    x_n = [events[i][0] for i in neighborhood_indices]
+    y_n = [events[i][1] for i in neighborhood_indices]
+    ts_n = [events[i][2] for i in neighborhood_indices]
+
+    # Ensure there are enough points to fit a plane
+    if len(x_n) < 3:
+        return None, None, None  # Not enough points to define a plane
+
+    # Setup the design matrix A for the least squares problem
+    A = np.c_[x_n, y_n, np.ones(len(x_n))]
+    B = np.array(ts_n)
+
+    # Solve the least squares problem
+    coefficients, residuals, rank, s = np.linalg.lstsq(A, B, rcond=None)
+    # coefficients are [a, b, c] for the plane equation z = ax + by + c
+    return coefficients if coefficients.size else (None, None, None)
+
+# Note: This function expects a definition of get_neighborhood(x, y, t, events, neighborhood_size)
+# and proper event structure. Adapt and test with your specific data and requirements.
 
 # Example usage
 # Assuming x, y, ts are defined as arrays of your data points
@@ -109,6 +125,41 @@ def get_neighborhood(x: np.ndarray, y: np.ndarray, ts: np.ndarray, event: int, N
     neighborhood = time_window[spatial_window]
 
     return neighborhood
+
+def get_neighborhood(x, y, t, events, neighborhood_size):
+    """
+    Finds the indices of events within a spatiotemporal neighborhood of a given event.
+
+    Parameters:
+    x, y, t: Coordinates of the event for which to find the neighborhood.
+    events: List of all events (x, y, t).
+    neighborhood_size: Spatial extent of the neighborhood around the event.
+
+    Returns:
+    Indices of events within the neighborhood.
+    """
+
+    # Convert the list of events into numpy arrays for efficient computation
+    all_x = np.array([event[0] for event in events])
+    all_y = np.array([event[1] for event in events])
+    all_t = np.array([event[2] for event in events])
+
+    # Calculate squared distances from the event to all other events
+    distances = (all_x - x)**2 + (all_y - y)**2
+
+    # Determine which events are within the spatial neighborhood_size
+    spatial_neighbors = np.where(distances <= neighborhood_size**2)[0]
+
+    # Optionally, if you want to include a temporal component, you can define a time window
+    # For example, within ±delta_t of the event time:
+    # delta_t = some_value  # Define a suitable time window
+    # temporal_neighbors = np.where(abs(all_t - t) <= delta_t)[0]
+
+    # Combine spatial and temporal criteria (if temporal is used, otherwise just use spatial)
+    # neighborhood_indices = np.intersect1d(spatial_neighbors, temporal_neighbors)
+    neighborhood_indices = spatial_neighbors  # Use this if only considering spatial criteria
+
+    return neighborhood_indices
 
 # Example usage
 events = [(1, 2, 0.1), (2, 3, 0.2)]  # Define your events list
