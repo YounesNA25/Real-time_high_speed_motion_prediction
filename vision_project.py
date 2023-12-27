@@ -104,7 +104,6 @@ def local_plane_fitting(x, y, ts, event_idx, neighborhood_size=5, time_threshold
 
 
 
-
 def calculate_local_flow(x: np.ndarray, y: np.ndarray, t: np.ndarray, neighborhood_size: int = 5):
     """
     Calculate local flow using local plane fitting for each event.
@@ -161,7 +160,6 @@ def multi_spatial_scale_maxpooling(x: np.ndarray, y: np.ndarray, t: np.ndarray, 
         U_mean_values = []
         angle_mean_values = []
         sigma_values = range(10, 100, 10)  # Define spatial scales
-
         for sigma in sigma_values:
             spatial_window = event_window[(np.abs(x[event_window] - xi) <= sigma) & (np.abs(y[event_window] - yi) <= sigma)]
             if spatial_window.size > 0:
