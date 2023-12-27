@@ -126,40 +126,83 @@ def get_neighborhood(x: np.ndarray, y: np.ndarray, ts: np.ndarray, event: int, N
 
     return neighborhood
 
-def get_neighborhood(x, y, t, events, neighborhood_size):
+#############################First methode to get neighbors
+import bisect
+def find_spatiotemporal_neighbors(x, y, ts, e, N, dt):
     """
-    Finds the indices of events within a spatiotemporal neighborhood of a given event.
+    Find the spatiotemporal neighbors of an event within a 3D space.
 
     Parameters:
-    x, y, t: Coordinates of the event for which to find the neighborhood.
-    events: List of all events (x, y, t).
-    neighborhood_size: Spatial extent of the neighborhood around the event.
+    x, y, ts (array-like): The x, y, and ts coordinates of the events.
+    e (int): The index of the event of interest.
+    N (float): The spatial extent of the neighborhood (in x and y).
+    dt (float): The temporal extent of the neighborhood (in ts).
 
     Returns:
-    Indices of events within the neighborhood.
+    Indices of the neighboring events within the specified window.
     """
 
-    # Convert the list of events into numpy arrays for efficient computation
-    all_x = np.array([event[0] for event in events])
-    all_y = np.array([event[1] for event in events])
-    all_t = np.array([event[2] for event in events])
+    # Find the temporal window using binary search for efficiency
+    up_indice = bisect.bisect_right(ts, ts[e] + dt)
+    down_indice = bisect.bisect_left(ts, ts[e] - dt)
+    time_window = np.arange(down_indice, up_indice, 1)
 
-    # Calculate squared distances from the event to all other events
-    distances = (all_x - x)**2 + (all_y - y)**2
+    # Find neighbors within the spatial window
+    spatial_nei = time_window[np.where((x[e] - N <= x[time_window]) & (x[time_window] <= x[e] + N))[0]]
+    spatial_nei = spatial_nei[np.where((y[e] - N <= y[spatial_nei]) & (y[spatial_nei] <= y[e] + N))[0]]
 
-    # Determine which events are within the spatial neighborhood_size
-    spatial_neighbors = np.where(distances <= neighborhood_size**2)[0]
+    return spatial_nei
 
-    # Optionally, if you want to include a temporal component, you can define a time window
-    # For example, within ±delta_t of the event time:
-    # delta_t = some_value  # Define a suitable time window
-    # temporal_neighbors = np.where(abs(all_t - t) <= delta_t)[0]
+####################### Seconde methode to get neighbors
+def find_range(array, value, window):
+    """
+    A manual implementation to find the range around a value within an array.
+    """
+    low, high = 0, len(array)
+    while low < high:
+        mid = (low + high) // 2
+        if array[mid] < value - window:
+            low = mid + 1
+        elif array[mid] > value + window:
+            high = mid
+        else:
+            # Now iterate outwards from the mid point
+            l, r = mid, mid
+            while l > 0 and array[l] >= value - window:
+                l -= 1
+            while r < len(array) and array[r] <= value + window:
+                r += 1
+            return np.arange(l + 1, r)  # Return the range of indices
+    return np.array([])  # Return an empty array if nothing is found
 
-    # Combine spatial and temporal criteria (if temporal is used, otherwise just use spatial)
-    # neighborhood_indices = np.intersect1d(spatial_neighbors, temporal_neighbors)
-    neighborhood_indices = spatial_neighbors  # Use this if only considering spatial criteria
+def find_3d_neighbors(coord_x, coord_y, time_stamps, target_idx, spatial_window, time_window):
+    """
+    Find the spatiotemporal neighbors of an event within a 3D space.
 
-    return neighborhood_indices
+    Parameters:
+    coord_x, coord_y, time_stamps (array-like): The x, y, and time_stamps coordinates of the events.
+    target_idx (int): The index of the event of interest.
+    spatial_window (float): The spatial extent of the neighborhood (in x and y).
+    time_window (float): The temporal extent of the neighborhood (in time_stamps).
+
+    Returns:
+    Indices of the neighboring events within the specified window.
+    """
+
+    # Find the temporal window using a manual range finding method
+    temporal_window = find_range(time_stamps, time_stamps[target_idx], time_window)
+
+    # Find neighbors within the spatial window
+    spatial_neighbors = temporal_window[np.where((coord_x[target_idx] - spatial_window <= coord_x[temporal_window]) & 
+                                                 (coord_x[temporal_window] <= coord_x[target_idx] + spatial_window))[0]]
+    spatial_neighbors = spatial_neighbors[np.where((coord_y[target_idx] - spatial_window <= coord_y[spatial_neighbors]) & 
+                                                   (coord_y[spatial_neighbors] <= coord_y[target_idx] + spatial_window))[0]]
+
+    return spatial_neighbors
+
+
+
+
 
 # Example usage
 events = [(1, 2, 0.1), (2, 3, 0.2)]  # Define your events list
