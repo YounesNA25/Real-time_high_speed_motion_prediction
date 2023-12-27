@@ -1,3 +1,7 @@
+import numpy as np
+from tqdm import tqdm
+import scipy.io as sio
+
 def find_range(array, value, window):
     """
     A manual implementation to find the range around a value within an array.
@@ -44,9 +48,6 @@ def find_3d_neighbors(coord_x, coord_y, time_stamps, target_idx, spatial_window,
 
     return spatial_neighbors
 
-
-import numpy as np
-from tqdm import tqdm
 
 def local_plane_fitting(x, y, ts, event_idx, neighborhood_size=5, time_threshold=1000):
     """
@@ -95,19 +96,15 @@ def local_plane_fitting(x, y, ts, event_idx, neighborhood_size=5, time_threshold
             break
 
         # Refit the plane using only inliers
-        A_inliers = A[inliers]
-        B_inliers = B[inliers]
-        new_plane_params, _, _, _ = np.linalg.lstsq(A_inliers, B_inliers, rcond=None)
-
+        A = A[inliers]
+        B = B[inliers]
+        new_plane_params, _, _, _ = np.linalg.lstsq(A, B, rcond=None)
         # Calculate change in plane parameters
         eps = np.linalg.norm(new_plane_params - plane_params)
         plane_params = new_plane_params  # Update the plane parameters for the next iteration
-        print(inliers)
-
-        inliers = np.where(inliers)
+        #inliers = np.where(inliers)
         # # Update neighborhood indices to only include inliers
         neighborhood_idxs = neighborhood_idxs[inliers]
-        print(neighborhood_idxs)
     return plane_params, neighborhood_idxs
 
 
@@ -182,6 +179,15 @@ def robust_multi_scale_optical_flow(x_coords: np.ndarray,
     return local_flow, corrected_flow
 compute = True
 nb_images_to_show = 100
+# Retrieving the current path
+name_data_file = 'datamat.mat'
+# Loading the .mat file
+data = sio.loadmat(name_data_file)
+N_event_to_load = 200000
+# Access to the data in the .mat file
+ts = data['ts'].reshape(-1)#[:N_event_to_load]
+x  = data['x'] .reshape(-1)#[:N_event_to_load]
+y  = data['y'] .reshape(-1)#[:N_event_to_load]
 
 if compute:
     # estimate the local and the corrected flow
